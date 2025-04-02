@@ -206,7 +206,6 @@ impl Renderer {
             "█▄█ ▀▄▀ ██▄ █▀▄",
         ];
 
-        let len = gameover.len();
         self.stdout.execute(Clear(ClearType::All)).unwrap();
         for (i, line) in gameover.into_iter().enumerate() {
             self.stdout
@@ -219,7 +218,7 @@ impl Renderer {
         }
 
         self.stdout
-            .execute(MoveTo(0, len as u16))
+            .execute(MoveToColumn(0))
             .unwrap()
             .execute(Print("\n"))
             .unwrap()
