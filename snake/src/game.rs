@@ -1,12 +1,10 @@
 use crate::command::Command;
 use crate::direction::Direction;
 use crate::point::Point;
+use crate::render::Renderer;
 use crate::snake::Snake;
-use crossterm::cursor::Hide;
-use crossterm::terminal::{enable_raw_mode, size, Clear, ClearType, SetSize};
-use crossterm::ExecutableCommand;
+use crossterm::event::{poll, read, Event, KeyCode, KeyEvent, KeyModifiers};
 use rand::Rng;
-use std::io::Stdout;
 use std::time::{Duration, Instant};
 
 const MAX_INTERVAL: u16 = 700;
@@ -14,8 +12,7 @@ const MIN_INTERVAL: u16 = 200;
 const MAX_SPEED: u16 = 20;
 
 pub struct Game {
-    stdout: Stdout,
-    init_term_size: (u16, u16),
+    renderer: Renderer,
     width: u16,
     height: u16,
     food: Option<Point>,
@@ -25,17 +22,16 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(stdout: Stdout, width: u16, height: u16) -> Self {
-        let init_term_size: (u16, u16) = size().unwrap();
+    pub fn new(width: u16, height: u16) -> Self {
         Self {
-            stdout,
-            init_term_size,
+            renderer: Renderer::new(width, height),
             width,
             height,
             food: None,
             snake: Snake::new(
                 Point::new(width / 2, height / 2),
                 3,
+                0,
                 match rand::rng().random_range(0..4) {
                     0 => Direction::Up,
                     1 => Direction::Right,
@@ -50,15 +46,14 @@ impl Game {
 
     pub fn run(&mut self) {
         self.place_food();
-        self.prepare_ui();
-        self.render();
+        self.renderer.init();
+        self.renderer.render(&self.food, &self.snake);
 
         let mut done = false;
         while !done {
             let interval = self.calculate_interval();
             let direction = self.snake.get_direction();
             let now = Instant::now();
-
             while now.elapsed() < interval {
                 if let Some(cmd) = self.get_command(interval - now.elapsed()) {
                     match cmd {
@@ -75,7 +70,7 @@ impl Game {
                 }
             }
 
-            if self.collided_with_wall() || self.bitten() {
+            if self.snake.hit_wall(self.width, self.height) || self.snake.bit_self() {
                 done = true;
             } else {
                 self.snake.slither();
@@ -87,14 +82,16 @@ impl Game {
 
                         if self.score % ((self.width * self.height) / MAX_SPEED) == 0 {
                             self.speed += 1;
+                            self.snake.set_speed(self.speed)
                         }
                     }
                 }
-                self.render();
+
+                self.renderer.render(&self.food, &self.snake);
             }
         }
 
-        self.restore_ui();
+        self.renderer.restore();
         println!("Game Over! Your score is {}", self.score);
     }
 
@@ -110,14 +107,40 @@ impl Game {
         }
     }
 
-    fn prepare_ui(&mut self) {
-        enable_raw_mode().unwrap();
-        self.stdout
-            .execute(SetSize(self.width + 3, self.height + 3))
-            .unwrap()
-            .execute(Clear(ClearType::All))
-            .unwrap()
-            .execute(Hide)
-            .unwrap();
+    fn calculate_interval(&self) -> Duration {
+        let speed = MAX_SPEED - self.speed;
+        Duration::from_millis(
+            (MIN_INTERVAL + (((MAX_INTERVAL - MIN_INTERVAL) / MAX_SPEED) * speed)) as u64,
+        )
+    }
+
+    fn wait_for_key(&self, duration: Duration) -> Option<KeyEvent> {
+        if poll(duration).ok()? {
+            let event = read().ok()?;
+            if let Event::Key(key_event) = event {
+                return Some(key_event);
+            }
+        }
+
+        None
+    }
+
+    fn get_command(&self, duration: Duration) -> Option<Command> {
+        let kevt = self.wait_for_key(duration)?;
+        match kevt.code {
+            KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => Some(Command::Quit),
+            KeyCode::Char('c') | KeyCode::Char('C') => {
+                if kevt.modifiers == KeyModifiers::CONTROL {
+                    Some(Command::Quit)
+                } else {
+                    None
+                }
+            }
+            KeyCode::Up => Some(Command::Turn(Direction::Up)),
+            KeyCode::Right => Some(Command::Turn(Direction::Right)),
+            KeyCode::Down => Some(Command::Turn(Direction::Down)),
+            KeyCode::Left => Some(Command::Turn(Direction::Left)),
+            _ => None,
+        }
     }
 }

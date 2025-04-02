@@ -6,7 +6,6 @@ mod render;
 mod snake;
 
 fn main() {
-    let game = game::Game {};
-
-    game.run()
+    let mut game = game::Game::new(50, 20);
+    game.run();
 }
