@@ -1,7 +1,7 @@
 use std::io::{stdout, Stdout};
 
 use crossterm::{
-    cursor::{Hide, MoveTo, Show},
+    cursor::{Hide, MoveTo, MoveToColumn, Show},
     style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType, SetSize},
     ExecutableCommand,
@@ -195,5 +195,39 @@ impl Renderer {
                 .execute(Print(symbol))
                 .unwrap();
         }
+    }
+
+    pub fn draw_gameover(&mut self, score: u16) {
+        let gameover = vec![
+            "█▀▀ ▄▀█ █▀▄▀█ █▀▀",
+            "█▄█ █▀█ █░▀░█ ██▄",
+            "",
+            "█▀█ █░█ █▀▀ █▀█",
+            "█▄█ ▀▄▀ ██▄ █▀▄",
+        ];
+
+        let len = gameover.len();
+        self.stdout.execute(Clear(ClearType::All)).unwrap();
+        for (i, line) in gameover.into_iter().enumerate() {
+            self.stdout
+                .execute(MoveTo(0, i as u16))
+                .unwrap()
+                .execute(Print(line))
+                .unwrap()
+                .execute(Print("\n"))
+                .unwrap();
+        }
+
+        self.stdout
+            .execute(MoveTo(0, len as u16))
+            .unwrap()
+            .execute(Print("\n"))
+            .unwrap()
+            .execute(Print(format!("Your score: {}\n", score)))
+            .unwrap()
+            .execute(MoveToColumn(0))
+            .unwrap()
+            .execute(Print("Press any key to continue"))
+            .unwrap();
     }
 }

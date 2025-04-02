@@ -75,11 +75,9 @@ impl Game {
             } else {
                 self.snake.slither();
                 if let Some(food_pt) = self.food {
-                    if self.snake.get_head() == food_pt {
-                        self.snake.grow();
+                    if self.snake.eat(food_pt) {
                         self.place_food();
                         self.score += 1;
-
                         if self.score % ((self.width * self.height) / MAX_SPEED) == 0 {
                             self.speed += 1;
                             self.snake.set_speed(self.speed)
@@ -91,8 +89,9 @@ impl Game {
             }
         }
 
+        self.renderer.draw_gameover(self.score);
+        read().unwrap();
         self.renderer.restore();
-        println!("Game Over! Your score is {}", self.score);
     }
 
     fn place_food(&mut self) {

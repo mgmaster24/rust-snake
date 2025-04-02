@@ -59,7 +59,16 @@ impl Snake {
         self.direction = direction;
     }
 
-    pub fn grow(&mut self) {
+    pub fn eat(&mut self, food: Point) -> bool {
+        if food == self.get_head() {
+            self.grow();
+            return true;
+        }
+
+        false
+    }
+
+    fn grow(&mut self) {
         self.digesting = true;
     }
 
