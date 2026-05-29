@@ -1,0 +1,40 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM
+        run: wasm-pack build --target web snake/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.TERMINAL_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Deploy to S3
+        run: |
+          aws s3 cp snake/web/index.html s3://m2s2-terminal-bucket/snake/index.html
+          aws s3 cp snake/pkg/snake.js s3://m2s2-terminal-bucket/snake/snake.js
+          aws s3 cp snake/pkg/snake_bg.wasm s3://m2s2-terminal-bucket/snake/snake_bg.wasm \
+            --content-type application/wasm
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.TERMINAL_CF_DISTRO_ID }} \
+            --paths "/snake/*"

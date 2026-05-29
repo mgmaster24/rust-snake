@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Snake — M²S²</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0f;
+      color: #e2e8f0;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 1rem;
+    }
+    .header {
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+    .header a { color: #a855f7; text-decoration: none; }
+    #terminal { border: 1px solid #1e1e3a; border-radius: 4px; }
+    .controls {
+      font-size: 0.7rem;
+      color: #334155;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <div class="header"><a href="/">← game.m2s2.io</a></div>
+  <div id="terminal"></div>
+  <div class="controls">arrow keys or WASD &nbsp;·&nbsp; q to quit</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+  <script type="module">
+    import init, { WasmGame } from './snake.js';
+
+    const TICK_BASE = 200;   // ms — matches native MIN_INTERVAL ceiling
+    const TICK_FAST = 120;
+
+    const term = new Terminal({
+      cols: 44,
+      rows: 24,
+      theme: {
+        background: '#0a0a0f',
+        foreground: '#e2e8f0',
+        cursor:     '#a855f7',
+      },
+      fontFamily: '"Courier New", Courier, monospace',
+      fontSize: 16,
+      cursorStyle: 'block',
+      cursorBlink: false,
+    });
+
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal'));
+
+    await init();
+
+    let game = new WasmGame();
+    let ticker = null;
+    let waitingRestart = false;
+
+    function startTicker() {
+      const interval = game.score() > 10 ? TICK_FAST : TICK_BASE;
+      if (ticker) clearInterval(ticker);
+      ticker = setInterval(step, interval);
+    }
+
+    function step() {
+      if (waitingRestart) return;
+      game.tick();
+      if (game.is_over()) {
+        clearInterval(ticker);
+        ticker = null;
+        waitingRestart = true;
+        term.write(game.render_gameover());
+      } else {
+        term.write(game.render());
+      }
+    }
+
+    term.onKey(({ key, domEvent }) => {
+      if (waitingRestart) {
+        waitingRestart = false;
+        game = new WasmGame();
+        startTicker();
+        return;
+      }
+      if (domEvent.key === 'q' || domEvent.key === 'Q') {
+        clearInterval(ticker);
+        ticker = null;
+        waitingRestart = true;
+        term.write(game.render_gameover());
+        return;
+      }
+      game.input(domEvent.key);
+    });
+
+    // Initial render then start
+    term.write(game.render());
+    startTicker();
+  </script>
+</body>
+</html>
